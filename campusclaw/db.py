@@ -42,6 +42,59 @@ CREATE TABLE IF NOT EXISTS knowledge_entries (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id INTEGER PRIMARY KEY,
+    knowledge_entry_id INTEGER NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+    material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    class_id INTEGER NOT NULL REFERENCES classes(id),
+    ordinal INTEGER NOT NULL,
+    char_start INTEGER NOT NULL CHECK (char_start >= 0),
+    char_end INTEGER NOT NULL CHECK (char_end > char_start),
+    content TEXT NOT NULL CHECK (length(content) > 0),
+    index_status TEXT NOT NULL CHECK (index_status IN ('pending', 'ready', 'failed')),
+    index_version TEXT NOT NULL,
+    UNIQUE (material_id, ordinal)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunks_class_status ON knowledge_chunks(class_id, index_status);
+
+CREATE TRIGGER IF NOT EXISTS validate_chunk_source_insert
+BEFORE INSERT ON knowledge_chunks
+WHEN NOT EXISTS (
+    SELECT 1 FROM knowledge_entries k
+    JOIN materials m ON m.id = k.material_id
+    WHERE k.id = NEW.knowledge_entry_id
+      AND m.id = NEW.material_id
+      AND m.class_id = NEW.class_id
+      AND k.class_id = NEW.class_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'chunk source mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS validate_chunk_source_update
+BEFORE UPDATE OF knowledge_entry_id, material_id, class_id ON knowledge_chunks
+WHEN NOT EXISTS (
+    SELECT 1 FROM knowledge_entries k
+    JOIN materials m ON m.id = k.material_id
+    WHERE k.id = NEW.knowledge_entry_id
+      AND m.id = NEW.material_id
+      AND m.class_id = NEW.class_id
+      AND k.class_id = NEW.class_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'chunk source mismatch');
+END;
+
+CREATE TABLE IF NOT EXISTS chunk_terms (
+    chunk_id INTEGER NOT NULL REFERENCES knowledge_chunks(id) ON DELETE CASCADE,
+    term TEXT NOT NULL,
+    frequency INTEGER NOT NULL CHECK (frequency > 0),
+    PRIMARY KEY (chunk_id, term)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunk_terms_term ON chunk_terms(term);
 """
 
 
@@ -56,6 +109,18 @@ def connect(database_path: str) -> sqlite3.Connection:
 
 def initialize(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    from .tutor_schema import SCHEMA as tutor_schema
+    if 'subject' not in {row['name'] for row in conn.execute('PRAGMA table_info(materials)')}:
+        conn.execute("ALTER TABLE materials ADD COLUMN subject TEXT NOT NULL DEFAULT '通用'")
+    conn.executescript(tutor_schema)
+    from .mcp_schema import migrate
+    migrate(conn)
+    from .platform_schema import SCHEMA as platform_schema
+    conn.executescript(platform_schema)
+    from .attachments import migrate as migrate_attachments
+    migrate_attachments(conn)
+    from .workspace_schema import migrate as migrate_workspace
+    migrate_workspace(conn)
     conn.commit()
 
 

@@ -47,6 +47,13 @@ def authenticate(conn: sqlite3.Connection, username: str, password: str) -> dict
     }
 
 
+def get_user_by_id(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT id AS user_id, username, role, class_id FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return row_to_dict(row)
+
+
 def get_authorized_material(
     conn: sqlite3.Connection,
     *,
@@ -55,7 +62,7 @@ def get_authorized_material(
 ) -> dict[str, Any] | None:
     row = conn.execute(
         """
-        SELECT m.id, m.title, m.filename, m.class_id, m.status, k.content
+        SELECT m.id, m.title, m.filename, m.class_id, m.status, m.subject, k.content
         FROM materials m
         JOIN knowledge_entries k ON k.material_id = m.id AND k.class_id = m.class_id
         WHERE m.id = ? AND m.class_id = ? AND m.status = 'available'
@@ -68,7 +75,7 @@ def get_authorized_material(
 def list_materials_for_class(conn: sqlite3.Connection, *, class_id: int) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
-        SELECT m.id, m.title, m.filename, m.class_id, m.status, k.id AS knowledge_entry_id
+        SELECT m.id, m.title, m.filename, m.class_id, m.status, m.subject, k.id AS knowledge_entry_id
         FROM materials m
         JOIN knowledge_entries k ON k.material_id = m.id AND k.class_id = m.class_id
         WHERE m.class_id = ? AND m.status = 'available'
@@ -85,11 +92,14 @@ def upload_material(
     user: dict[str, Any],
     filename: str,
     content: bytes,
+    subject: str = '通用',
 ) -> dict[str, Any]:
     if user["role"] != ROLE_TEACHER:
         raise PermissionError("students cannot upload materials")
     if not filename or not content:
         raise ValueError("filename and content are required")
+    if not isinstance(subject, str) or not 1 <= len(subject.strip()) <= 64:
+        raise ValueError('学科必须为1至64字')
     parsed_content = parse_material(content)
     if parsed_content is None:
         raise ValueError("material parsing failed")
@@ -98,10 +108,10 @@ def upload_material(
     try:
         cursor = conn.execute(
             """
-            INSERT INTO materials (title, filename, class_id, teacher_id, status)
-            VALUES (?, ?, ?, ?, 'available')
+            INSERT INTO materials (title, filename, class_id, teacher_id, status, subject)
+            VALUES (?, ?, ?, ?, 'available', ?)
             """,
-            (title, title, user["class_id"], user["user_id"]),
+            (title, title, user["class_id"], user["user_id"], subject.strip()),
         )
         material_id = int(cursor.lastrowid)
         conn.execute(
@@ -120,6 +130,7 @@ def upload_material(
         "title": title,
         "class_id": user["class_id"],
         "status": "available",
+        "subject": subject.strip(),
     }
 
 

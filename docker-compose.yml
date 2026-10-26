@@ -9,6 +9,17 @@ services:
       DEMO_TEACHER_PASSWORD: ${DEMO_TEACHER_PASSWORD:-}
       DEMO_STUDENT_PASSWORD: ${DEMO_STUDENT_PASSWORD:-}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-course-embedding}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-2048}
+      CHAT_MODEL: ${CHAT_MODEL:-course-chat}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,qdrant,ai-gateway.devops.hello1023.com}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-campusclaw_course_embedding_v1}
+    depends_on:
+      qdrant:
+        condition: service_healthy
     volumes:
       - campusclaw-data:/app/data
     healthcheck:
@@ -17,6 +28,32 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+  qdrant:
+    image: qdrant/qdrant:v1.19.0
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mcp-demo:
+    build: ./mcp-server
+    environment:
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?MCP_AUTH_TOKEN is required}
+    ports:
+      - "127.0.0.1:8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   campusclaw-data:
+  qdrant-data:

@@ -1,0 +1,8 @@
+.env
+.git
+data/
+output/
+tmp/
+apitest/reports/
+**/__pycache__/
+**/*.pyc

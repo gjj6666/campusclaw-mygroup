@@ -7,6 +7,7 @@ from campusclaw.services import (
     authenticate,
     create_user,
     get_authorized_material,
+    get_user_by_id,
     list_materials_for_class,
     upload_material,
 )
@@ -56,6 +57,16 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(teacher["role"], "teacher")
         self.assertEqual(student["role"], "student")
         self.assertIsNone(authenticate(self.conn, "teacher_a", "wrong"))
+
+    def test_token_user_lookup_reflects_current_role_and_class(self):
+        self.conn.execute(
+            "UPDATE users SET role = 'student', class_id = 2 WHERE id = ?", (self.teacher_id,)
+        )
+        user = get_user_by_id(self.conn, self.teacher_id)
+        self.assertEqual(user["user_id"], self.teacher_id)
+        self.assertEqual((user["role"], user["class_id"]), ("student", 2))
+        self.conn.execute("DELETE FROM users WHERE id = ?", (self.teacher_id,))
+        self.assertIsNone(get_user_by_id(self.conn, self.teacher_id))
 
     def test_teacher_upload_creates_material_and_knowledge_for_own_class(self):
         teacher = {"user_id": self.teacher_id, "role": "teacher", "class_id": 1}

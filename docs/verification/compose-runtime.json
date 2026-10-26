@@ -1,0 +1,138 @@
+[
+  {
+    "stage": "独立 MCP health/list/call",
+    "tools": [
+      "formula_hint",
+      "unit_convert"
+    ],
+    "conversion": "100 cm = 1 m"
+  },
+  {
+    "stage": "内置应用启动",
+    "key": "course-qa",
+    "conversation_id": 17
+  },
+  {
+    "stage": "内置应用启动",
+    "key": "guided-solving",
+    "conversation_id": 18
+  },
+  {
+    "stage": "内置应用启动",
+    "key": "study-plan",
+    "conversation_id": 19
+  },
+  {
+    "stage": "内置模板渲染",
+    "prompt": "你是物理解题教练，面向本班学生。目标是理解受力分析。先确认已知量和学生思路，每次只给下一步提示并检查推理，不直接给出最终答案。"
+  },
+  {
+    "stage": "Compose 实际发现",
+    "base_url": "http://mcp-demo:8090",
+    "tools": [
+      "formula_hint@campus-tools",
+      "unit_convert@campus-tools"
+    ]
+  },
+  {
+    "stage": "学生真实流式",
+    "expected": "ok",
+    "meta": {
+      "conversation_id": 20,
+      "message_id": 26,
+      "skill": {
+        "id": 5,
+        "name": "平台演示工具技能"
+      },
+      "sources": [],
+      "tool_calls": [
+        {
+          "tool_ref": "formula_hint@campus-tools",
+          "status": "ok",
+          "message": ""
+        }
+      ],
+      "context": {
+        "skill": {
+          "id": 5,
+          "name": "平台演示工具技能",
+          "source": "shared",
+          "mode": "auto"
+        },
+        "materials": []
+      }
+    },
+    "events": [
+      "meta",
+      "error"
+    ],
+    "answer": ""
+  },
+  {
+    "stage": "学生真实流式",
+    "expected": "denied",
+    "meta": {
+      "conversation_id": 20,
+      "message_id": 28,
+      "skill": {
+        "id": 5,
+        "name": "平台演示工具技能"
+      },
+      "sources": [],
+      "tool_calls": [
+        {
+          "tool_ref": "formula_hint@campus-tools",
+          "status": "denied",
+          "message": "MCP 工具未获授权、未连接或未发现"
+        }
+      ],
+      "context": {
+        "skill": {
+          "id": 5,
+          "name": "平台演示工具技能",
+          "source": "shared",
+          "mode": "auto"
+        },
+        "materials": []
+      }
+    },
+    "events": [
+      "meta",
+      "error"
+    ],
+    "answer": ""
+  },
+  {
+    "stage": "审计",
+    "audits": [
+      {
+        "id": 9,
+        "class_id": 1,
+        "user_id": 2,
+        "conversation_id": 20,
+        "tool_ref": "formula_hint@campus-tools",
+        "status": "denied",
+        "detail": "MCP 工具未获授权、未连接或未发现",
+        "created_at": "2026-10-26 12:25:25",
+        "username": "student_a"
+      },
+      {
+        "id": 8,
+        "class_id": 1,
+        "user_id": 2,
+        "conversation_id": 20,
+        "tool_ref": "formula_hint@campus-tools",
+        "status": "ok",
+        "detail": "",
+        "created_at": "2026-10-26 12:25:24",
+        "username": "student_a"
+      }
+    ]
+  },
+  {
+    "stage": "知识库关键词接口",
+    "status": 200,
+    "results_count": 0,
+    "note": "无命中不等于真实有资料检索通过；完整带资料链路另见隔离接口报告"
+  }
+]

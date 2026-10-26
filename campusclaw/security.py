@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -11,6 +12,7 @@ from typing import Any
 
 PBKDF2_ITERATIONS = 210_000
 HASH_ALGORITHM = "sha256"
+ACCESS_TOKEN_TTL_SECONDS = 3_600
 
 
 def hash_password(password: str, *, salt: bytes | None = None) -> str:
@@ -62,12 +64,11 @@ def _decode_b64_json(value: str) -> dict[str, Any]:
     return decoded
 
 
-def sign_session(user: dict[str, Any], secret_key: str, *, ttl_seconds: int = 86_400) -> str:
+def sign_session(
+    user: dict[str, Any], secret_key: str, *, ttl_seconds: int = ACCESS_TOKEN_TTL_SECONDS
+) -> str:
     payload = {
         "user_id": user["id"],
-        "username": user["username"],
-        "role": user["role"],
-        "class_id": user["class_id"],
         "exp": int(time.time()) + ttl_seconds,
     }
     payload_text = _b64_json(payload)
@@ -92,8 +93,12 @@ def verify_session(token: str | None, secret_key: str | None) -> dict[str, Any] 
         return None
     try:
         payload = _decode_b64_json(payload_text)
-    except (ValueError, json.JSONDecodeError):
+        user_id = payload["user_id"]
+        expires_at = payload["exp"]
+    except (ValueError, KeyError, UnicodeError, binascii.Error):
         return None
-    if int(payload.get("exp", 0)) < int(time.time()):
+    if type(user_id) is not int or user_id <= 0 or type(expires_at) is not int:
+        return None
+    if expires_at <= int(time.time()):
         return None
     return payload
